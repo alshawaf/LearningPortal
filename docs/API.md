@@ -1,0 +1,95 @@
+# واجهة API
+
+المسار الأساسي: `/api/v1`. جميع الردود JSON، والجلسة عبر Cookie فقط؛ لا تحفظ الواجهة رموزًا في `localStorage`.
+
+## المصادقة
+
+| الطريقة | المسار | الصلاحية | الوصف |
+|---|---|---|---|
+| `POST` | `/auth/login` | عام | الدخول بالبريد أو رقم الجوال وكلمة المرور وإنشاء جلسة |
+| `GET` | `/auth/session` | مستخدم | قراءة المستخدم والجلسة الحالية |
+| `POST` | `/auth/logout` | مستخدم + CSRF | إبطال الجلسة الحالية |
+| `POST` | `/auth/change-password` | مستخدم + CSRF | تغيير الكلمة وإبطال جميع الجلسات |
+
+## الإدارة والمقررات
+
+| الطريقة | المسار | الصلاحية |
+|---|---|---|
+| `GET` | `/admin/users` | مدير |
+| `POST` | `/admin/users` | مدير + CSRF؛ يتطلب `academicLevelId` عند إنشاء طالب |
+| `PATCH` | `/admin/users/:userId` | مدير + CSRF؛ يتطلب `academicLevelId` عندما يكون الدور طالبًا |
+| `PATCH` | `/admin/users/:userId/status` | مدير + CSRF؛ تغيير حالة الحساب |
+| `GET` | `/courses` | مستخدم؛ النتائج مفلترة وفق العضوية/RLS |
+| `GET` | `/academic-structure` | مستخدم؛ يعيد الدوائر وتخصصاتها ومستوياتها النشطة |
+| `POST` | `/academic-structure/departments` | مدير + CSRF؛ إضافة دائرة |
+| `POST` | `/academic-structure/departments/:departmentId/specializations` | مدير + CSRF؛ إضافة تخصص إلى دائرة |
+| `POST` | `/academic-structure/specializations/:specializationId/levels` | مدير + CSRF؛ إضافة مستوى إلى تخصص |
+| `PATCH` | `/academic-structure/departments/:departmentId` | مدير + CSRF؛ تعديل رمز الدائرة واسمها |
+| `PATCH` | `/academic-structure/specializations/:specializationId` | مدير + CSRF؛ تعديل رمز التخصص واسمه |
+| `PATCH` | `/academic-structure/levels/:levelId` | مدير + CSRF؛ تعديل رقم المستوى واسمه |
+| `GET` | `/courses/catalog` | مدير؛ دليل المقررات المستقل عن التشغيل الأكاديمي |
+| `POST` | `/courses` | مدير + CSRF؛ إنشاء تعريف مقرر بالرمز والاسم فقط |
+| `PATCH` | `/courses/:courseId` | مدير + CSRF؛ تعديل رمز المقرر واسمه |
+| `PATCH` | `/courses/:courseId/status` | مدير + CSRF؛ تفعيل المقرر أو إيقافه |
+| `GET` | `/assignments` | مستخدم؛ الواجبات المسموحة وفق RLS |
+| `GET` | `/assignments/:assignmentId/submissions` | الطالب صاحب التسليم أو مدير/أستاذ المقرر |
+| `POST` | `/assignments/:assignmentId/submissions` | طالب عضو + CSRF |
+| `GET` | `/people` | مدير أو أستاذ؛ النتائج مفلترة وفق الصلاحيات |
+
+## التدريبات البرمجية
+
+| الطريقة | المسار | الصلاحية | الوصف |
+|---|---|---|---|
+| `GET` | `/practice` | مستخدم | قائمة التدريبات المسموحة حسب المقرر والعضوية والحالة |
+| `GET` | `/practice/:exerciseId` | مستخدم | التفاصيل؛ لا يعيد الحل المرجعي أو الاختبارات المخفية للطالب |
+| `POST` | `/practice/preview` | مدير أو أستاذ المقرر + CSRF | تشغيل الحل المرجعي مع المدخلات ومعاينة المخرجات التي ستُولّد تلقائياً |
+| `POST` | `/practice` | مدير أو أستاذ المقرر + CSRF | إنشاء تدريب Python كمسودة |
+| `PATCH` | `/practice/:exerciseId` | مدير أو أستاذ المقرر + CSRF | تعديل المسودة، أو التحقق من تدريب منشور وإنشاء إصدار جديد مع حفظ نتائج الإصدارات السابقة |
+| `PATCH` | `/practice/:exerciseId/status` | مدير أو أستاذ المقرر + CSRF | النشر بعد نجاح الحل المرجعي في جميع الاختبارات، أو الأرشفة |
+| `POST` | `/practice/:exerciseId/run` | طالب مسجل + CSRF | تشغيل تجريبي على الاختبارات العامة دون حفظ محاولة |
+| `POST` | `/practice/:exerciseId/submit` | طالب مسجل + CSRF | تسليم رسمي على جميع الاختبارات وحفظ المحاولة والنقاط |
+| `GET` | `/practice/:exerciseId/students` | مدير أو أستاذ المقرر | ملخص تقدم الطلاب دون البريد أو رقم الجوال |
+| `GET` | `/practice/:exerciseId/students/:studentId/attempts` | مدير أو أستاذ المقرر | قائمة محاولات طالب داخل المقرر |
+| `GET` | `/practice/:exerciseId/attempts/:attemptId` | مدير أو أستاذ المقرر | الشفرة والنتائج بوضع القراءة فقط، مع تسجيل الاطلاع في سجل التدقيق |
+
+يُستخدم `comparisonMode: "auto"` افتراضياً لاكتشاف القيم العددية والتصنيفات والنصوص ومقارنة معناها مع تجاهل اختلافات التنسيق غير المؤثرة. يولّد `autoGenerateExpected: true` المخرجات المتوقعة من الحل المرجعي، ولذلك يكفي أن يرسل الأستاذ مدخلات الحالات. يوفر `POST /practice/preview` معاينة لهذه النتائج قبل الحفظ. تبقى `comparisonMode: "exact"` للمطابقة التامة، و`comparisonMode: "flexible"` للإعداد اليدوي عبر `ignoreCase` و`whitespaceMode`. يمنع `suppressInputPrompts` النص المرسل إلى `input(...)` من تلويث المخرجات المقاسة.
+
+كل تدريب يستخدم نمطًا واحدًا: `stdin` مع `{stdin}` و`{stdout}`، أو `function` مع `{arguments}` و`{return}`. لا تعيد نتيجة التسليم بيانات الإدخال أو المخرج المتوقع للاختبار المخفي.
+
+## التشغيل الأكاديمي وطرح المقررات والأنشطة
+
+| الطريقة | المسار | الصلاحية | الوصف |
+|---|---|---|---|
+| `GET` | `/course-offerings` | مستخدم | الأعوام والفصول والدفعات والشُّعب وطرح المقررات المسموح بها وفق RLS |
+| `POST` | `/course-offerings/years` | مدير + CSRF | إنشاء عام أكاديمي |
+| `PATCH` | `/course-offerings/years/:yearId` | مدير + CSRF | تعديل العام الأكاديمي وحالته |
+| `POST` | `/course-offerings/terms` | مدير + CSRF | إنشاء فصل دراسي داخل عام أكاديمي وتحديد ترتيبه |
+| `PATCH` | `/course-offerings/terms/:termId` | مدير + CSRF | تعديل بيانات الفصل الأكاديمي وحالته |
+| `POST` | `/course-offerings/cohorts` | مدير + CSRF | إنشاء دفعة داخل تخصص |
+| `PATCH` | `/course-offerings/cohorts/:cohortId` | مدير + CSRF | تعديل الدفعة وحالتها |
+| `POST` | `/course-offerings/sections` | مدير + CSRF | إنشاء شعبة لدفعة ومستوى وعام أكاديمي |
+| `PATCH` | `/course-offerings/sections/:sectionId` | مدير + CSRF | تعديل الشعبة وحالتها |
+| `GET` | `/course-offerings/sections/:sectionId/students` | مدير أو أستاذ مرتبط بالشعبة | أعضاء الشعبة والطلاب المتاحون للإسناد |
+| `POST` | `/course-offerings/sections/:sectionId/students` | مدير + CSRF | إسناد طالب إلى الشعبة؛ يلغي عضويته النشطة الأخرى في العام نفسه |
+| `PATCH` | `/course-offerings/sections/:sectionId/students/:studentId` | مدير + CSRF | تغيير حالة عضوية الطالب في الشعبة |
+| `POST` | `/course-offerings` | مدير + CSRF | إنشاء طرح لمقرر وربطه بفصل وأستاذ وشعبة |
+| `PATCH` | `/course-offerings/:offeringId` | مدير + CSRF | تعديل المقرر والفصل والشعبة والأستاذ وحالة الطرح مع التحقق من وحدة العام الأكاديمي |
+| `GET` | `/course-offerings/:offeringId/enrollments` | مدير أو أستاذ الطرح | عرض طلاب الطرح الموروثين للقراءة فقط من عضوية الشعبة |
+| `GET` | `/course-offerings/:offeringId/assignments` | عضو في الطرح أو مدير | واجبات الطرح |
+| `POST` | `/course-offerings/:offeringId/assignments` | مدير أو أستاذ الطرح + CSRF | إنشاء واجب داخل الطرح |
+| `GET` | `/activities?offeringId=` | مستخدم | الأنشطة التعليمية العامة المسموحة داخل طرح مقرر |
+
+يحافظ `courses` على تعريف المقرر الدائم، ولا يرتبط التعريف بأستاذ أو طلاب أو مستوى. يعرّف المدير الأعوام الأكاديمية وفصولها والدفعات والشُّعب يدويًا، ثم يُسند كل طالب إلى شعبة واحدة نشطة في العام الأكاديمي. يمثل `course-offerings` تدريس مقرر لشعبة خلال فصل دراسي وبواسطة أستاذ محدد، ويرث طلابه من عضوية الشعبة دون تسجيل موازٍ على مستوى الطرح. ترتبط الواجبات والتدريبات والنقاط بالطرح مباشرة، وكل تدريب أو واجب يملك سجلًا أصليًا في `learning_activities` مع بقاء تفاصيل النوع في جدوله المتخصص.
+
+في الطلبات المعدِّلة ترسل الواجهة قيمة Cookie المسماة `mc_csrf` (`__Host-mc_csrf` في الإنتاج) في الترويسة `x-csrf-token`. لا تُقبل قيمة الدور أو معرّف المستخدم من جسم الطلب لتحديد الهوية.
+
+يرسل طلب الدخول الحقل `identifier`، ويمكن أن يحتوي بريدًا إلكترونيًا أو رقم جوال. تُوحّد أرقام الجوال إلى E.164 قبل البحث؛ مثلًا `777123456` و`00967777123456` يصبحان `+967777123456`. إنشاء المستخدم يتطلب بريدًا ورقم جوال فريدين، ويمكن للحساب الدخول بأي منهما. عند إنشاء طالب أو تحويل دور حساب إلى طالب، يجب إرسال معرّف مستوى نشط تابع لتخصص ودائرة نشطين، أما حسابات المدير والأستاذ فيجب أن ترسل `academicLevelId: null`.
+
+## الأخطاء
+
+- `400`: مدخلات غير صالحة.
+- `401`: لا توجد جلسة صالحة.
+- `403`: الجلسة صحيحة لكن الصلاحية غير كافية أو CSRF غير صالح.
+- `429`: تجاوز حد الطلبات.
+- `503`: خدمة حاويات التنفيذ غير متاحة أو تجاوزت مهلة البنية التحتية.
+- `500`: خطأ داخلي عام دون تسريب تفاصيل قاعدة البيانات أو المكدس للعميل.

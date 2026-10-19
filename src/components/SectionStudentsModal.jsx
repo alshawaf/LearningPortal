@@ -1,0 +1,21 @@
+import { Search, UserPlus, Users, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { apiFetch } from '../lib/api';
+import Select from './Select';
+
+const statusLabels={active:'نشط',withdrawn:'منسحب',completed:'مكتمل',suspended:'معلّق'};
+const statusOptions=Object.entries(statusLabels).map(([value,label])=>({value,label}));
+
+export default function SectionStudentsModal({section,onClose,onChanged}){
+ const [data,setData]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [query,setQuery]=useState('');const [busy,setBusy]=useState('');
+ const load=useCallback(async()=>{setLoading(true);setError('');try{setData(await apiFetch(`/course-offerings/sections/${section.id}/students`));}catch(e){setError(e.message||'تعذر تحميل طلاب الشعبة.');}finally{setLoading(false);}},[section.id]);
+ useEffect(()=>{void load();},[load]);
+ const candidates=useMemo(()=>{const needle=query.trim().toLowerCase();return(data?.candidates??[]).filter(item=>!needle||`${item.displayName} ${item.email} ${item.phone??''}`.toLowerCase().includes(needle));},[data?.candidates,query]);
+ const action=async(key,work)=>{setBusy(key);setError('');try{await work();await Promise.all([load(),onChanged?.()]);}catch(e){setError(e.message||'تعذر حفظ التغيير.');}finally{setBusy('');}};
+ return <div className="modal-backdrop" role="presentation"><section className="modal modal--roster" role="dialog" aria-modal="true" aria-labelledby="section-students-title"><header><div><h2 id="section-students-title">طلاب الشعبة</h2><small>{section.name} · {section.cohortName} · {section.academicYearName}</small></div><button className="icon-button" onClick={onClose} aria-label="إغلاق"><X/></button></header><div className="roster-content">
+  {error?<div className="auth-error" role="alert">{error}</div>:null}{loading&&!data?<div className="data-state">جارٍ تحميل الطلاب...</div>:null}
+  {data?<><div className="roster-context"><Users/><p><strong>{data.section.specializationName} ‹ {data.section.levelName}</strong><span>عضوية الطالب هنا تمنحه جميع مقررات الشعبة المطروحة في هذا العام.</span></p></div>
+  <div className="roster-list">{data.members.length?data.members.map(student=><article className="roster-student" key={student.studentId}><span className="roster-avatar">{student.displayName[0]}</span><div className="roster-student__identity"><strong>{student.displayName}</strong><small dir="ltr">{student.email}{student.phone?` · ${student.phone}`:''}</small></div><div className="roster-student__meta"><em className={`enrollment-badge enrollment-badge--${student.status}`}>{statusLabels[student.status]}</em><Select ariaLabel={`حالة ${student.displayName}`} value={student.status} onValueChange={status=>action(`status-${student.studentId}`,()=>apiFetch(`/course-offerings/sections/${section.id}/students/${student.studentId}`,{method:'PATCH',body:JSON.stringify({status,reason:['withdrawn','suspended'].includes(status)?'تغيير إداري لحالة عضوية الشعبة':null})}))} options={statusOptions} disabled={Boolean(busy)}/></div></article>):<div className="academic-empty"><Users/><p>لا يوجد طلاب في هذه الشعبة بعد.</p></div>}</div>
+  <section className="roster-candidates"><div className="roster-toolbar"><div><h3>إسناد طالب إلى الشعبة</h3><p>لا يظهر هنا الطالب المرتبط بشعبة أخرى في العام الأكاديمي نفسه.</p></div></div><label className="roster-search"><Search/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="ابحث بالاسم أو البريد أو الجوال"/></label><div className="roster-candidate-list">{candidates.length?candidates.map(student=><article key={student.studentId}><div><strong>{student.displayName}</strong><span>{student.specializationName||'دون تخصص'} ‹ {student.levelName||'دون مستوى'}</span><small dir="ltr">{student.email}</small></div><button type="button" className="table-action" disabled={Boolean(busy)} onClick={()=>action(`add-${student.studentId}`,()=>apiFetch(`/course-offerings/sections/${section.id}/students`,{method:'POST',body:JSON.stringify({studentId:student.studentId})}))}><UserPlus/> إضافة</button></article>):<div className="academic-empty">لا يوجد طلاب متاحون للإضافة.</div>}</div></section></>:null}
+ </div><footer><button type="button" className="button button--outline" onClick={onClose}>إغلاق</button></footer></section></div>;
+}
