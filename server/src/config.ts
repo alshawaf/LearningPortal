@@ -8,6 +8,7 @@ const schema = z.object({
   TRUSTED_PROXY: z.string().trim().min(1).optional(),
   WEB_ORIGIN: z.string().url(),
   DATABASE_URL: z.string().min(20),
+  DATABASE_SSL_MODE: z.enum(['disable', 'private-network', 'require', 'verify-full']).optional(),
   DATABASE_POOL_MAX: z.coerce.number().int().min(2).max(50).default(10),
   SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(8),
   IP_HASH_SECRET: z.string().min(32),
@@ -29,6 +30,11 @@ if (!parsed.success) {
 if (parsed.data.NODE_ENV === 'production' && !parsed.data.PRACTICE_RUNNER_SHARED_SECRET) {
   throw new Error('Invalid server configuration: PRACTICE_RUNNER_SHARED_SECRET');
 }
+const databaseSslMode = parsed.data.DATABASE_SSL_MODE
+  ?? (parsed.data.NODE_ENV === 'production' ? 'verify-full' : 'disable');
+if (parsed.data.NODE_ENV === 'production' && databaseSslMode === 'disable') {
+  throw new Error('Invalid server configuration: DATABASE_SSL_MODE');
+}
 
 export const config = {
   nodeEnv: parsed.data.NODE_ENV,
@@ -37,6 +43,7 @@ export const config = {
   trustedProxy: parsed.data.TRUSTED_PROXY ?? false,
   webOrigin: new URL(parsed.data.WEB_ORIGIN).origin,
   databaseUrl: parsed.data.DATABASE_URL,
+  databaseSslMode,
   databasePoolMax: parsed.data.DATABASE_POOL_MAX,
   sessionTtlHours: parsed.data.SESSION_TTL_HOURS,
   ipHashSecret: parsed.data.IP_HASH_SECRET,

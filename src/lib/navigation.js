@@ -1,3 +1,5 @@
+import { featureEnabled } from '../config/features';
+
 const DEFAULT_PAGE = 'dashboard';
 
 const rolePages = {
@@ -50,6 +52,8 @@ export function pageFromLocation(location = window.location) {
 }
 
 export function isPageAllowed(page, role) {
+  if (page === 'assignments' && !featureEnabled('assignments', role)) return false;
+  if (page === 'grades' && !featureEnabled('grades', role)) return false;
   return rolePages[role]?.has(page) ?? false;
 }
 

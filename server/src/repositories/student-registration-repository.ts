@@ -83,6 +83,22 @@ export class StudentRegistrationRepository {
     });
   }
 
+  async listEligibleSections(actor: AuthUser) {
+    return withUserContext(actor, async (client) => {
+      const result = await client.query(
+        `select x.id,x.level_id,x.name,x.code,y.name as academic_year_name,c.name as cohort_name
+         from app.academic_sections x join app.academic_years y on y.id=x.academic_year_id
+         join app.student_cohorts c on c.id=x.cohort_id
+         where x.status='active' and y.status='active'
+         order by y.starts_on desc nulls last,c.name,x.name`,
+      );
+      return result.rows.map((row) => ({
+        id: row.id, levelId: row.level_id, name: row.name, code: row.code,
+        academicYearName: row.academic_year_name, cohortName: row.cohort_name,
+      }));
+    });
+  }
+
   async update(actor: AuthUser, requestId: string, input: {
     email: string; phone: string; displayName: string; studentNumber: string | null; academicLevelId: string;
   }) {
@@ -93,13 +109,13 @@ export class StudentRegistrationRepository {
     });
   }
 
-  async decide(actor: AuthUser, requestId: string, decision: 'approved' | 'rejected' | 'changes_requested', reason: string | null) {
+  async decide(actor: AuthUser, requestId: string, decision: 'approved' | 'rejected' | 'changes_requested', reason: string | null, sectionId: string | null) {
     return withUserContext(actor, async (client) => {
-      const result = await client.query<{ admin_decide_student_registration: string | null }>(
-        'select app.admin_decide_student_registration($1, $2, $3, $4)',
-        [actor.id, requestId, decision, reason],
+      const result = await client.query<{ admin_decide_student_registration_with_section: string | null }>(
+        'select app.admin_decide_student_registration_with_section($1, $2, $3, $4, $5)',
+        [actor.id, requestId, decision, reason, sectionId],
       );
-      return result.rows[0]!.admin_decide_student_registration;
+      return result.rows[0]!.admin_decide_student_registration_with_section;
     });
   }
 }

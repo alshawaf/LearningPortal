@@ -6,8 +6,8 @@ type CalendarInput = { code: string; name: string; startsOn: string | null; ends
 export class CourseOfferingRepository {
   list(user: AuthUser) {
     return withUserContext(user, async (client) => {
-      const years = await client.query(`select id,code,name,starts_on,ends_on,status from app.academic_years order by starts_on desc nulls last,created_at desc`);
-      const terms = await client.query(`select t.id,t.academic_year_id,t.term_number,t.code,t.name,t.starts_on,t.ends_on,t.status,t.is_system,
+      const years = await client.query(`select id,code,name,to_char(starts_on,'YYYY-MM-DD') as starts_on,to_char(ends_on,'YYYY-MM-DD') as ends_on,status from app.academic_years order by starts_on desc nulls last,created_at desc`);
+      const terms = await client.query(`select t.id,t.academic_year_id,t.term_number,t.code,t.name,to_char(t.starts_on,'YYYY-MM-DD') as starts_on,to_char(t.ends_on,'YYYY-MM-DD') as ends_on,t.status,t.is_system,
                              y.name as academic_year_name,y.code as academic_year_code
                       from app.academic_terms t join app.academic_years y on y.id=t.academic_year_id
                       order by y.starts_on desc nulls last,t.term_number`);

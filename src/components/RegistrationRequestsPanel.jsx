@@ -11,10 +11,11 @@ const dateFormatter = new Intl.DateTimeFormat('ar-YE', { dateStyle: 'medium', ti
 
 export default function RegistrationRequestsPanel({ departments, onUserApproved }) {
   const [requests, setRequests] = useState([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  const [sections, setSections] = useState([]);
   const [query, setQuery] = useState(''); const [status, setStatus] = useState('pending'); const [selected, setSelected] = useState(null); const [notice, setNotice] = useState('');
   const load = useCallback(async () => {
     setLoading(true); setError('');
-    try { const result = await apiFetch('/registration/admin'); setRequests(result.requests); }
+    try { const result = await apiFetch('/registration/admin'); setRequests(result.requests); setSections(result.sections ?? []); }
     catch (caught) { setError(caught.message); }
     finally { setLoading(false); }
   }, []);
@@ -45,14 +46,16 @@ export default function RegistrationRequestsPanel({ departments, onUserApproved 
         <button className="table-action" onClick={() => setSelected(request)}><FilePenLine /> {request.status === 'pending' || request.status === 'changes_requested' ? 'مراجعة الطلب' : 'عرض الطلب'}</button>
       </article>)}</div>
     </DataState>
-    {selected ? <RegistrationReviewModal request={selected} departments={departments} onClose={() => setSelected(null)} onSaved={saved} /> : null}
+    {selected ? <RegistrationReviewModal request={selected} departments={departments} sections={sections} onClose={() => setSelected(null)} onSaved={saved} /> : null}
     {notice ? <div className="toast" role="status">{notice}</div> : null}
   </section>;
 }
 
-function RegistrationReviewModal({ request, departments, onClose, onSaved }) {
+function RegistrationReviewModal({ request, departments, sections, onClose, onSaved }) {
   const editable = request.status === 'pending' || request.status === 'changes_requested';
   const [submitting, setSubmitting] = useState(false); const [error, setError] = useState(''); const [reason, setReason] = useState(request.decisionReason ?? '');
+  const eligibleSections = sections.filter((section) => section.levelId === request.levelId);
+  const [sectionId, setSectionId] = useState(eligibleSections.length === 1 ? eligibleSections[0].id : '');
   const saveDetails = async (event) => {
     event.preventDefault(); setSubmitting(true); setError(''); const values = new FormData(event.currentTarget);
     try {
@@ -66,7 +69,7 @@ function RegistrationReviewModal({ request, departments, onClose, onSaved }) {
   const decide = async (decision) => {
     setSubmitting(true); setError('');
     try {
-      const result = await apiFetch(`/registration/admin/${request.id}/decision`, { method: 'POST', body: JSON.stringify({ decision, reason: decision === 'approved' ? null : reason }) });
+      const result = await apiFetch(`/registration/admin/${request.id}/decision`, { method: 'POST', body: JSON.stringify({ decision, reason: decision === 'approved' ? null : reason, sectionId: decision === 'approved' ? sectionId || null : null }) });
       await onSaved(result.message, decision === 'approved');
     } catch (caught) { setError(caught.message); setSubmitting(false); }
   };
@@ -89,7 +92,7 @@ function RegistrationReviewModal({ request, departments, onClose, onSaved }) {
       <aside className="registration-decision-panel">
         <div className="registration-review-section-title"><ShieldAlert /><div><h3>قرار المراجعة</h3><p>سيظهر سبب طلب التعديل أو الرفض للطالب.</p></div></div>
         <dl><div><dt>حالة الطلب</dt><dd><span className={`registration-request-status registration-request-status--${request.status}`}>{statusLabels[request.status] ?? request.status}</span></dd></div><div><dt>وقت التقديم</dt><dd>{dateFormatter.format(new Date(request.createdAt))}</dd></div>{request.reviewedByName ? <div><dt>راجعه</dt><dd>{request.reviewedByName}</dd></div> : null}</dl>
-        {editable ? <><label>ملاحظة القرار<textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength="500" placeholder="مطلوبة عند طلب تعديل البيانات أو رفض الطلب" /></label><div className="registration-decision-actions"><button className="button button--primary" disabled={submitting} onClick={() => decide('approved')}><UserCheck /> موافقة وتفعيل الحساب</button><button className="button button--outline" disabled={submitting || reason.trim().length < 3} onClick={() => decide('changes_requested')}>طلب تعديل</button><button className="button button--danger" disabled={submitting || reason.trim().length < 3} onClick={() => decide('rejected')}>رفض الطلب</button></div></> : request.decisionReason ? <div className="registration-admin-note"><strong>ملاحظة القرار</strong><p>{request.decisionReason}</p></div> : null}
+        {editable ? <><label>الشعبة عند الموافقة<Select ariaLabel="شعبة الطالب" value={sectionId} onValueChange={setSectionId} options={eligibleSections.map((section) => ({ value: section.id, label: `${section.name} — ${section.cohortName} — ${section.academicYearName}` }))} placeholder={eligibleSections.length ? 'اختر الشعبة' : 'لا توجد شعبة نشطة مطابقة للمستوى'} disabled={!eligibleSections.length} /></label><p className="modal-note">عند الموافقة سيُفعّل الحساب ويُربط الطالب بهذه الشعبة ومقرراتها في عملية واحدة.</p><label>ملاحظة القرار<textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength="500" placeholder="مطلوبة عند طلب تعديل البيانات أو رفض الطلب" /></label><div className="registration-decision-actions"><button className="button button--primary" disabled={submitting || !sectionId} onClick={() => decide('approved')}><UserCheck /> موافقة وتفعيل وربط الحساب</button><button className="button button--outline" disabled={submitting || reason.trim().length < 3} onClick={() => decide('changes_requested')}>طلب تعديل</button><button className="button button--danger" disabled={submitting || reason.trim().length < 3} onClick={() => decide('rejected')}>رفض الطلب</button></div></> : request.decisionReason ? <div className="registration-admin-note"><strong>ملاحظة القرار</strong><p>{request.decisionReason}</p></div> : null}
       </aside>
     </div>
     <footer><span>تُسجل كل تعديلات وقرارات الإدارة في سجل التدقيق.</span><button className="button button--outline" onClick={onClose}>إغلاق</button></footer>

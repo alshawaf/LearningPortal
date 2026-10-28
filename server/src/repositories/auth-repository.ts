@@ -105,6 +105,16 @@ export class AuthRepository {
     });
   }
 
+  async resetUserPassword(input: { actorId: string; targetId: string; passwordHash: string; ipHash: Buffer | null }): Promise<void> {
+    await withUserContext({ id: input.actorId, role: 'admin' }, async (client) => {
+      await client.query('select app.admin_reset_user_password($1, $2, $3)', [input.actorId, input.targetId, input.passwordHash]);
+      await client.query('select app.write_audit($1, $2, $3, $4, $5::jsonb, $6)', [
+        input.actorId, 'admin.user.password_reset', 'user', input.targetId,
+        JSON.stringify({ sessionsRevoked: true, mustChangePassword: true }), input.ipHash,
+      ]);
+    });
+  }
+
   async audit(input: { actorId: string | null; action: string; targetType: string; targetId: string | null; metadata?: object; ipHash: Buffer | null }): Promise<void> {
     await this.db.query('select app.write_audit($1, $2, $3, $4, $5::jsonb, $6)', [
       input.actorId, input.action, input.targetType, input.targetId,

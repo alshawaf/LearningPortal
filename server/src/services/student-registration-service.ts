@@ -31,6 +31,11 @@ export class StudentRegistrationService {
     return this.repository.list(actor);
   }
 
+  sections(actor: AuthUser) {
+    if (actor.role !== 'admin') throw new AuthorizationError('غير مصرح.');
+    return this.repository.listEligibleSections(actor);
+  }
+
   update(actor: AuthUser, requestId: string, input: {
     email: string; phone: string; displayName: string; studentNumber: string | null; academicLevelId: string;
   }) {
@@ -38,8 +43,8 @@ export class StudentRegistrationService {
     return this.repository.update(actor, requestId, input);
   }
 
-  decide(actor: AuthUser, requestId: string, decision: 'approved' | 'rejected' | 'changes_requested', reason: string | null) {
+  decide(actor: AuthUser, requestId: string, decision: 'approved' | 'rejected' | 'changes_requested', reason: string | null, sectionId: string | null) {
     if (actor.role !== 'admin') throw new AuthorizationError('غير مصرح.');
-    return this.repository.decide(actor, requestId, decision, reason);
+    return this.repository.decide(actor, requestId, decision, reason, sectionId);
   }
 }

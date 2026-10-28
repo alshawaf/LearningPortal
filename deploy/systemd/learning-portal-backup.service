@@ -1,0 +1,9 @@
+[Unit]
+Description=Learning Portal verified PostgreSQL backup
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/learning-portal
+ExecStart=/bin/sh deploy/scripts/backup.sh deploy/.env.production
+User=learning-portal
+Group=docker

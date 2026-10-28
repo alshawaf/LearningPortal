@@ -72,7 +72,7 @@ export function StudentRegistrationPage({ onNavigate }) {
         <label>تأكيد كلمة المرور<input name="confirmPassword" type={showPassword ? 'text' : 'password'} required minLength="8" maxLength="40" autoComplete="new-password" /></label>
       </div>
       <p className="registration-password-hint"><LockKeyhole /> من 8 إلى 40 حرفاً، وتحتوي على حروف وأرقام. تُحفظ بصورة مشفرة.</p>
-      <label className="registration-consent"><input type="checkbox" required /> <span>أقر بصحة البيانات وأوافق على استخدامها لمراجعة الطلب وربط الحساب بالمسار الأكاديمي.</span></label>
+      <label className="registration-consent"><input type="checkbox" required /> <span>أقر بصحة البيانات وأوافق على استخدامها لمراجعة الطلب وربط الحساب بالمسار الأكاديمي وفق <button type="button" className="inline-link" onClick={() => onNavigate('privacy')}>سياسة الخصوصية</button>.</span></label>
       <button className="button button--primary registration-submit" disabled={submitting || !departments.length}><UserRoundPlus /> {submitting ? 'جارٍ إرسال الطلب...' : 'إرسال طلب التسجيل'}</button>
     </>}
     <button type="button" className="auth-text-button" onClick={() => onNavigate('login')}>لديك حساب؟ تسجيل الدخول</button>

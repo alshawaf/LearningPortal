@@ -2,13 +2,14 @@ import 'dotenv/config';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import pg from 'pg';
+import { databaseSslFromEnv } from '../db/ssl.js';
 
 const adminUrl = process.env.DATABASE_ADMIN_URL;
 const appDbUser = process.env.APP_DB_USER;
 if (!adminUrl) throw new Error('DATABASE_ADMIN_URL is required');
 if (!appDbUser || !/^[a-z_][a-z0-9_]*$/.test(appDbUser)) throw new Error('APP_DB_USER must be a safe lowercase PostgreSQL identifier');
 
-const client = new pg.Client({ connectionString: adminUrl, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false });
+const client = new pg.Client({ connectionString: adminUrl, ssl: databaseSslFromEnv() });
 await client.connect();
 
 try {

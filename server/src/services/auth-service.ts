@@ -132,6 +132,19 @@ export class AuthService {
     });
   }
 
+  async resetUserPassword(input: { actor: AuthUser; targetId: string; temporaryPassword: string; ip?: string }): Promise<void> {
+    if (input.actor.role !== 'admin') throw new AuthorizationError('غير مصرح.');
+    const errors = validatePassword(input.temporaryPassword);
+    if (errors.length) throw new ValidationError(errors);
+    const passwordHash = await hashPassword(input.temporaryPassword);
+    await this.repository.resetUserPassword({
+      actorId: input.actor.id,
+      targetId: input.targetId,
+      passwordHash,
+      ipHash: hashIp(input.ip),
+    });
+  }
+
   private toAuthUser(candidate: { id: string; email: string; phone: string | null; displayName: string; role: AppRole; mustChangePassword: boolean }): AuthUser {
     return {
       id: candidate.id, email: candidate.email, phone: candidate.phone, displayName: candidate.displayName,

@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, CheckCircle2, Clock3, Eye, Search, UserRoundCheck, UsersRound } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, Download, Eye, Search, UserRoundCheck, UsersRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import Select from '../components/Select';
 import StudentActivityModal from '../components/StudentActivityModal';
@@ -32,8 +32,15 @@ export default function StudentActivityPage({ role, courses }) {
   }, [data.students, query, status]);
 
   const summary = data.summary;
+  const exportCsv = () => {
+    const columns = ['الطالب', 'التخصص', 'المستوى', 'التدريبات المكتملة', 'إجمالي التدريبات', 'المحاولات', 'النقاط', 'الحالة'];
+    const quote = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+    const rows = filtered.map((student) => [student.displayName, student.specializationName, student.levelName, student.completedCount, student.exerciseCount, student.attemptCount, student.points, statusLabels[student.status]]);
+    const blob = new Blob([`\uFEFF${[columns, ...rows].map((row) => row.map(quote).join(',')).join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `student-activity-${new Date().toISOString().slice(0, 10)}.csv`; link.click(); URL.revokeObjectURL(url);
+  };
   return <div className="stack-lg">
-    <PageHeading title="نشاط الطلاب" description={role === 'admin' ? 'متابعة النشاط الأكاديمي عبر المقررات ضمن نطاق صلاحيات الإدارة.' : 'تابع تقدم طلاب مقرراتك وحدد من يحتاج إلى دعم مبكر.'} />
+    <PageHeading title="نشاط الطلاب" description={role === 'admin' ? 'متابعة النشاط الأكاديمي عبر المقررات ضمن نطاق صلاحيات الإدارة.' : 'تابع تقدم طلاب مقرراتك وحدد من يحتاج إلى دعم مبكر.'} action={<button className="table-action" onClick={exportCsv} disabled={!filtered.length}><Download /> تصدير CSV</button>} />
     <section className="activity-summary">
       <div><UsersRound /><span>إجمالي الطلاب</span><strong>{summary.studentCount}</strong></div>
       <div><Activity /><span>نشطون خلال 7 أيام</span><strong>{summary.activeCount}</strong></div>

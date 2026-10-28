@@ -2,6 +2,7 @@ import 'dotenv/config';
 import pg from 'pg';
 import { hashPassword, validatePassword } from '../security/password.js';
 import { normalizePhone } from '../security/identity.js';
+import { databaseSslFromEnv } from '../db/ssl.js';
 
 const databaseUrl = process.env.DATABASE_ADMIN_URL;
 const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
@@ -14,7 +15,7 @@ if (rawPhone && !phone) throw new Error('BOOTSTRAP_ADMIN_PHONE must be a valid i
 const passwordErrors = validatePassword(password);
 if (passwordErrors.length) throw new Error(`Bootstrap password rejected: ${passwordErrors.join(' ')}`);
 
-const client = new pg.Client({ connectionString: databaseUrl, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false });
+const client = new pg.Client({ connectionString: databaseUrl, ssl: databaseSslFromEnv() });
 await client.connect();
 try {
   await client.query('begin');

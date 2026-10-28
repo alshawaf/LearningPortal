@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
+      - run: docker compose -f compose.production.yaml config --quiet
+        env:
+          APP_DOMAIN: ci.example.test
+          SUPPORT_EMAIL: ci@example.test
+          POSTGRES_DB: ci
+          POSTGRES_USER: ci_owner
+          POSTGRES_PASSWORD: ci-owner-password-32-characters-long
+          APP_DB_USER: ci_api
+          APP_DB_PASSWORD: ci-api-password-32-characters-long
+          IP_HASH_SECRET: ci-ip-secret-32-characters-long-0001
+          PRACTICE_RUNNER_SHARED_SECRET: ci-runner-secret-32-characters-0001

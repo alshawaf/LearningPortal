@@ -1,0 +1,133 @@
+name: learning-portal
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  postgres:
+    image: postgres:17.7-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      APP_DB_USER: ${APP_DB_USER:?required}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?required}
+    volumes:
+      - learning_portal_postgres:/var/lib/postgresql/data
+      - ./server/db/init:/docker-entrypoint-initdb.d:ro
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    security_opt: [no-new-privileges:true]
+    logging: *default-logging
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: ["node", "server/dist/scripts/migrate.js"]
+    restart: "no"
+    environment: &api-env
+      NODE_ENV: production
+      DATABASE_SSL_MODE: private-network
+      DATABASE_ADMIN_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      APP_DB_USER: ${APP_DB_USER}
+      WEB_ORIGIN: https://${APP_DOMAIN:?required}
+      IP_HASH_SECRET: ${IP_HASH_SECRET:?required}
+      PRACTICE_RUNNER_SHARED_SECRET: ${PRACTICE_RUNNER_SHARED_SECRET:?required}
+      PRACTICE_RUNNER_URL: http://runner:4001
+      TRUSTED_PROXY: 172.16.0.0/12
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [data]
+    logging: *default-logging
+
+  runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.runner
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      WEB_ORIGIN: https://${APP_DOMAIN}
+      DATABASE_URL: postgresql://unused:unused@localhost/unused_database
+      IP_HASH_SECRET: ${IP_HASH_SECRET}
+      PRACTICE_RUNNER_SHARED_SECRET: ${PRACTICE_RUNNER_SHARED_SECRET}
+      PRACTICE_RUNNER_IMAGE: ${PRACTICE_RUNNER_IMAGE:-python:3.12-alpine}
+      RUNNER_HOST: 0.0.0.0
+      RUNNER_PORT: 4001
+      RUNNER_MAX_CONCURRENCY: ${RUNNER_MAX_CONCURRENCY:-2}
+      RUNNER_MAX_QUEUE: ${RUNNER_MAX_QUEUE:-50}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [execution]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+    security_opt: [no-new-privileges:true]
+    logging: *default-logging
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    environment:
+      <<: *api-env
+      API_HOST: 0.0.0.0
+      API_PORT: 4000
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-8}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      runner: { condition: service_healthy }
+    networks: [data, execution, web]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+    security_opt: [no-new-privileges:true]
+    logging: *default-logging
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        VITE_RELEASE_MODE: pilot-practices
+        VITE_SUPPORT_EMAIL: ${SUPPORT_EMAIL:?required}
+        VITE_DATA_RETENTION_DAYS: ${DATA_RETENTION_DAYS:-365}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WEB_BIND_PORT:-8080}:80"
+    depends_on:
+      api: { condition: service_healthy }
+    networks: [web]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+    security_opt: [no-new-privileges:true]
+    logging: *default-logging
+
+networks:
+  web:
+  data:
+    internal: true
+  execution:
+    internal: true
+
+volumes:
+  learning_portal_postgres:

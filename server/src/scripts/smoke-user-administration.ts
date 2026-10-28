@@ -15,6 +15,7 @@ const updatedEmail = `student.updated.${Date.now()}@example.edu`;
 const createdStudentEmail = `student.created.${Date.now()}@example.edu`;
 const adminPassword = 'Admin-Management-Smoke-2026!';
 const studentPassword = 'Student-Management-Smoke-2026!';
+const resetPassword = 'Temporary-Reset-2026!';
 const client = new pg.Client({ connectionString: databaseUrl });
 const userIds: string[] = [];
 let app: Awaited<ReturnType<typeof buildApp>> | null = null;
@@ -62,6 +63,56 @@ try {
   const cookies = cookiesFrom(login);
   const csrf = cookieValue(cookies, 'mc_csrf');
 
+  const studentLogin = await app.inject({
+    method: 'POST', url: '/api/v1/auth/login', headers: { origin }, payload: { identifier: studentEmail, password: studentPassword },
+  });
+  assert.equal(studentLogin.statusCode, 200, studentLogin.body);
+  const studentCookies = cookiesFrom(studentLogin);
+  const studentCsrf = cookieValue(studentCookies, 'mc_csrf');
+
+  const forbiddenReset = await app.inject({
+    method: 'PATCH', url: `/api/v1/admin/users/${adminId}/password`,
+    headers: { origin, cookie: studentCookies, 'x-csrf-token': studentCsrf },
+    payload: { temporaryPassword: resetPassword, confirmPassword: resetPassword },
+  });
+  assert.equal(forbiddenReset.statusCode, 403, forbiddenReset.body);
+
+  const mismatchedReset = await app.inject({
+    method: 'PATCH', url: `/api/v1/admin/users/${studentId}/password`,
+    headers: { origin, cookie: cookies, 'x-csrf-token': csrf },
+    payload: { temporaryPassword: resetPassword, confirmPassword: `${resetPassword}x` },
+  });
+  assert.equal(mismatchedReset.statusCode, 400, mismatchedReset.body);
+
+  const passwordReset = await app.inject({
+    method: 'PATCH', url: `/api/v1/admin/users/${studentId}/password`,
+    headers: { origin, cookie: cookies, 'x-csrf-token': csrf },
+    payload: { temporaryPassword: resetPassword, confirmPassword: resetPassword },
+  });
+  assert.equal(passwordReset.statusCode, 200, passwordReset.body);
+
+  const revokedStudentSession = await app.inject({ method: 'GET', url: '/api/v1/auth/session', headers: { cookie: studentCookies } });
+  assert.equal(revokedStudentSession.statusCode, 401, revokedStudentSession.body);
+  const oldPasswordLogin = await app.inject({
+    method: 'POST', url: '/api/v1/auth/login', headers: { origin }, payload: { identifier: studentEmail, password: studentPassword },
+  });
+  assert.equal(oldPasswordLogin.statusCode, 401, oldPasswordLogin.body);
+  const temporaryPasswordLogin = await app.inject({
+    method: 'POST', url: '/api/v1/auth/login', headers: { origin }, payload: { identifier: studentEmail, password: resetPassword },
+  });
+  assert.equal(temporaryPasswordLogin.statusCode, 200, temporaryPasswordLogin.body);
+  assert.equal(temporaryPasswordLogin.json().user.mustChangePassword, true);
+  const resetAudit = await client.query(
+    `select metadata from app.audit_logs where actor_user_id=$1 and target_id=$2 and action='admin.user.password_reset' order by created_at desc limit 1`,
+    [adminId, studentId],
+  );
+  assert.deepEqual(resetAudit.rows[0]?.metadata, { sessionsRevoked: true, mustChangePassword: true });
+  const auditLog = await app.inject({ method: 'GET', url: '/api/v1/admin/audit?action=password_reset&limit=10', headers: { cookie: cookies } });
+  assert.equal(auditLog.statusCode, 200, auditLog.body);
+  assert.ok(auditLog.json().entries.some((entry: { action: string; targetId: string }) => entry.action === 'admin.user.password_reset' && entry.targetId === studentId));
+  const forbiddenAudit = await app.inject({ method: 'GET', url: '/api/v1/admin/audit', headers: { cookie: cookiesFrom(temporaryPasswordLogin) } });
+  assert.equal(forbiddenAudit.statusCode, 403, forbiddenAudit.body);
+
   const missingLevel = await app.inject({
     method: 'POST', url: '/api/v1/admin/users',
     headers: { origin, cookie: cookies, 'x-csrf-token': csrf },
@@ -93,7 +144,7 @@ try {
   assert.equal(suspend.statusCode, 200, suspend.body);
 
   const deniedLogin = await app.inject({
-    method: 'POST', url: '/api/v1/auth/login', headers: { origin }, payload: { identifier: updatedEmail, password: studentPassword },
+    method: 'POST', url: '/api/v1/auth/login', headers: { origin }, payload: { identifier: updatedEmail, password: resetPassword },
   });
   assert.equal(deniedLogin.statusCode, 401, deniedLogin.body);
 
@@ -109,7 +160,7 @@ try {
     email: updatedEmail, phone_e164: `+96773${suffix.slice(-7)}`,
     display_name: 'مستخدم محدّث', role: 'instructor', status: 'suspended', academic_level_id: null,
   });
-  console.log('User administration integration smoke test passed.');
+  console.log('User administration, password reset, and admin-only audit log integration smoke test passed.');
 } finally {
   if (app) await app.close();
   if (userIds.length) {

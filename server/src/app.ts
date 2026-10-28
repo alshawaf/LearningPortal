@@ -150,6 +150,10 @@ export async function buildApp() {
             ? 'لا يمكن تعديل أو مراجعة طلب حُسم مسبقاً.'
           : constraint === 'registration_decision_reason_required'
             ? 'يجب كتابة سبب واضح لطلب التعديل أو الرفض.'
+          : constraint === 'registration_section_required'
+            ? 'يجب اختيار شعبة للطالب عند الموافقة على الطلب.'
+          : constraint === 'registration_section_eligible'
+            ? 'الشعبة المختارة غير نشطة أو لا تطابق مستوى الطالب.'
           : 'القيمة المطلوبة تخالف قواعد سلامة البيانات.';
       return reply.code(409).send({ error: { code: 'ACCOUNT_SAFETY_CONFLICT', message } });
     }

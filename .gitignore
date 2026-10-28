@@ -5,5 +5,8 @@ server/dist/
 .env.*
 !.env.example
 coverage/
+backups/
+deploy/.env.production
+/HIC_WebSite/
 *.log
 .DS_Store

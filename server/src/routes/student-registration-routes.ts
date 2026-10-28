@@ -34,10 +34,12 @@ const updateSchema = z.object(registrationFields).strict();
 const decisionSchema = z.object({
   decision: z.enum(['approved', 'rejected', 'changes_requested']),
   reason: z.string().trim().max(500).nullable(),
+  sectionId: z.string().uuid().nullable(),
 }).strict().superRefine((value, context) => {
   if (value.decision !== 'approved' && (!value.reason || value.reason.length < 3)) {
     context.addIssue({ code: 'custom', path: ['reason'], message: 'اكتب سببًا واضحًا للقرار.' });
   }
+  if (value.decision === 'approved' && !value.sectionId) context.addIssue({ code: 'custom', path: ['sectionId'], message: 'اختر الشعبة التي سينضم إليها الطالب.' });
 });
 
 type Hooks = ReturnType<typeof createAuthHooks>;
@@ -68,7 +70,10 @@ export async function registerStudentRegistrationRoutes(
     return { registration };
   });
 
-  app.get('/admin', { preHandler: adminGuards }, async (request) => ({ requests: await service.list(request.authUser!) }));
+  app.get('/admin', { preHandler: adminGuards }, async (request) => {
+    const [requests, sections] = await Promise.all([service.list(request.authUser!), service.sections(request.authUser!)]);
+    return { requests, sections };
+  });
 
   app.patch('/admin/:requestId', { preHandler: [...adminGuards, hooks.requireCsrf] }, async (request) => {
     const { requestId } = requestParams.parse(request.params);
@@ -79,7 +84,7 @@ export async function registerStudentRegistrationRoutes(
   app.post('/admin/:requestId/decision', { preHandler: [...adminGuards, hooks.requireCsrf] }, async (request) => {
     const { requestId } = requestParams.parse(request.params);
     const input = decisionSchema.parse(request.body);
-    const approvedUserId = await service.decide(request.authUser!, requestId, input.decision, input.reason);
+    const approvedUserId = await service.decide(request.authUser!, requestId, input.decision, input.reason, input.sectionId);
     return { message: input.decision === 'approved' ? 'تمت الموافقة وتفعيل حساب الطالب.' : 'تم حفظ قرار المراجعة.', approvedUserId };
   });
 }

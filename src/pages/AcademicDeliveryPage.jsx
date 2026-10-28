@@ -4,6 +4,7 @@ import { AcademicTermModal, AcademicYearModal, CohortModal, CourseOfferingModal,
 import SectionStudentsModal from '../components/SectionStudentsModal';
 import { DataState, EmptyState, PageHeading } from '../components/Ui';
 import { apiFetch } from '../lib/api';
+import { formatDateOnly } from '../lib/date';
 
 const statusLabels={planned:'مخطط',active:'نشط',completed:'مكتمل',graduated:'متخرجة',archived:'مؤرشف'};
 const tabs=[['offerings','الطروحات',BookCopy],['sections','الشُّعب',School],['cohorts','الدفعات',GraduationCap],['terms','الفصول',CalendarDays],['years','الأعوام',Layers3]];
@@ -43,4 +44,4 @@ function DeliveryModal({modal,data,instructors,departments,onClose,onSaved,onCha
 function singular(value){return{years:'year',terms:'term',cohorts:'cohort',sections:'section',offerings:'offering'}[value];}
 function addLabel(value){return{years:'إضافة عام',terms:'إضافة فصل',cohorts:'إضافة دفعة',sections:'إضافة شعبة',offerings:'طرح مقرر'}[value];}
 function emptyText(value){return{years:'أنشئ العام الأكاديمي أولاً.',terms:'أضف فصولاً دراسية تابعة لعام أكاديمي.',cohorts:'أنشئ دفعة مرتبطة بتخصص.',sections:'أنشئ شعبة لدفعة ومستوى وعام أكاديمي.',offerings:'اختر مقرراً وشعبة وفصلاً دراسياً لإنشاء أول طرح.'}[value];}
-function dateRange(item){return item.startsOn||item.endsOn?`${item.startsOn??'بداية مفتوحة'} — ${item.endsOn??'نهاية مفتوحة'}`:'لم تحدد التواريخ';}
+function dateRange(item){return item.startsOn||item.endsOn?`${formatDateOnly(item.startsOn)||'بداية مفتوحة'} — ${formatDateOnly(item.endsOn)||'نهاية مفتوحة'}`:'لم تحدد التواريخ';}

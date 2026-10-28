@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api';
 
-export function usePlatformData(role) {
+export function usePlatformData(role, { includeAssignments = true } = {}) {
   const [data, setData] = useState({ courses: [], catalogCourses: [], assignments: [], people: [], departments: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -10,7 +10,7 @@ export function usePlatformData(role) {
     setLoading(true);
     setError('');
     try {
-      const requests = [apiFetch('/courses'), apiFetch('/assignments')];
+      const requests = [apiFetch('/courses'), includeAssignments ? apiFetch('/assignments') : Promise.resolve({ assignments: [] })];
       if (role === 'admin' || role === 'instructor') requests.push(apiFetch('/people'));
       else requests.push(Promise.resolve({ people: [] }));
       if (role === 'admin') requests.push(apiFetch('/academic-structure'));
@@ -30,7 +30,7 @@ export function usePlatformData(role) {
     } finally {
       setLoading(false);
     }
-  }, [role]);
+  }, [includeAssignments, role]);
 
   useEffect(() => { void refresh(); }, [refresh]);
   return { ...data, loading, error, refresh };

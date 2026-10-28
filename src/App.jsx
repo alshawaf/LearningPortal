@@ -10,8 +10,10 @@ import { useAuth } from './auth/AuthContext';
 import LoginPage from './auth/LoginPage';
 import ChangePasswordPage from './auth/ChangePasswordPage';
 import { RegistrationStatusPage, StudentRegistrationPage } from './auth/StudentRegistrationPage';
+import PrivacyPage from './auth/PrivacyPage';
 import { usePlatformData } from './hooks/usePlatformData';
 import { DEFAULT_PAGE, isPageAllowed, pageFromLocation, pagePath, writePagePath } from './lib/navigation';
+import { featureEnabled } from './config/features';
 
 const Workspace = lazy(() => import('./pages/Workspace'));
 const PeoplePage = lazy(() => import('./pages/PeoplePage'));
@@ -22,6 +24,7 @@ const PracticeWorkspace = lazy(() => import('./pages/PracticeWorkspace'));
 const StudentActivityPage = lazy(() => import('./pages/StudentActivityPage'));
 const AcademicDeliveryPage = lazy(() => import('./pages/AcademicDeliveryPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const PracticePilotDashboard = lazy(() => import('./pages/PracticePilotDashboard'));
 
 export default function App() {
   const { user, loading, logout, refreshSession } = useAuth();
@@ -32,6 +35,7 @@ export default function App() {
   const [modalType, setModalType] = useState(null);
 
   if (loading) return <div className="app-loading"><span className="loading-mark">&lt;/&gt;</span><p>جارٍ التحقق من الجلسة...</p></div>;
+  if (window.location.pathname === '/privacy') return <PrivacyPage onBack={() => { window.history.pushState({}, '', user ? '/' : '/login'); window.location.reload(); }} />;
   if (!user) return <PublicAuthFlow />;
   if (user.mustChangePassword) return <ChangePasswordPage />;
 
@@ -40,10 +44,10 @@ export default function App() {
 }
 
 function PublicAuthFlow() {
-  const routeFromLocation = () => window.location.pathname === '/register' ? 'register' : window.location.pathname === '/registration-status' ? 'status' : 'login';
+  const routeFromLocation = () => window.location.pathname === '/register' ? 'register' : window.location.pathname === '/registration-status' ? 'status' : window.location.pathname === '/privacy' ? 'privacy' : 'login';
   const [route, setRoute] = useState(routeFromLocation);
   const navigate = useCallback((nextRoute) => {
-    const path = nextRoute === 'register' ? '/register' : nextRoute === 'status' ? '/registration-status' : '/login';
+    const path = nextRoute === 'register' ? '/register' : nextRoute === 'status' ? '/registration-status' : nextRoute === 'privacy' ? '/privacy' : '/login';
     window.history.pushState({ publicAuth: nextRoute }, '', path);
     setRoute(nextRoute);
   }, []);
@@ -52,14 +56,16 @@ function PublicAuthFlow() {
     window.addEventListener('popstate', restore);
     return () => window.removeEventListener('popstate', restore);
   }, []);
+  if (route === 'privacy') return <PrivacyPage onBack={() => navigate('login')} />;
   if (route === 'register') return <StudentRegistrationPage onNavigate={navigate} />;
   if (route === 'status') return <RegistrationStatusPage onNavigate={navigate} />;
-  return <LoginPage onRegister={() => navigate('register')} />;
+  return <LoginPage onRegister={() => navigate('register')} onPrivacy={() => navigate('privacy')} />;
 }
 
 function AuthenticatedApp({ user, role, page, setPage, workspace, setWorkspace, practiceWorkspace, setPracticeWorkspace, menuOpen, setMenuOpen, modalType, setModalType, logout, refreshSession }) {
   const platformRole = role === 'teacher' ? 'instructor' : role;
-  const platform = usePlatformData(platformRole);
+  const assignmentsEnabled = featureEnabled('assignments', role);
+  const platform = usePlatformData(platformRole, { includeAssignments: assignmentsEnabled });
   const currentPage = isPageAllowed(page, role) ? page : DEFAULT_PAGE;
   const navigate = useCallback((nextPage) => {
     const allowedPage = isPageAllowed(nextPage, role) ? nextPage : DEFAULT_PAGE;
@@ -101,9 +107,13 @@ function AuthenticatedApp({ user, role, page, setPage, workspace, setWorkspace, 
 
   let content;
   const shared = { loading: platform.loading, error: platform.error };
-  if (currentPage === 'dashboard') content = role === 'student'
-    ? <StudentDashboard user={user} courses={platform.courses} assignments={platform.assignments} onNavigate={navigate} onOpenWorkspace={setWorkspace} {...shared} />
-    : <OverviewPage role={role} courses={platform.courses} assignments={platform.assignments} people={platform.people} onNavigate={navigate} onCreate={() => setModalType(role === 'admin' ? 'course' : 'assignment')} {...shared} />;
+  if (currentPage === 'dashboard') content = role === 'admin'
+    ? <OverviewPage role={role} courses={platform.courses} assignments={platform.assignments} people={platform.people} onNavigate={navigate} onCreate={() => setModalType('course')} {...shared} />
+    : assignmentsEnabled
+      ? role === 'student'
+        ? <StudentDashboard user={user} courses={platform.courses} assignments={platform.assignments} onNavigate={navigate} onOpenWorkspace={setWorkspace} {...shared} />
+        : <OverviewPage role={role} courses={platform.courses} assignments={platform.assignments} people={platform.people} onNavigate={navigate} onCreate={() => setModalType('assignment')} {...shared} />
+      : <PracticePilotDashboard role={role} user={user} courses={platform.courses} onNavigate={navigate} />;
   else if (currentPage === 'courses') content = <CoursesPage role={role} courses={role === 'admin' ? platform.catalogCourses : platform.courses} instructors={platform.people.filter((person) => person.role === 'instructor' && person.status === 'active')} departments={platform.departments} onRefresh={platform.refresh} onNavigate={navigate} onCreate={role === 'admin' ? () => setModalType('course') : undefined} {...shared} />;
   else if (currentPage === 'academic-delivery' && role === 'admin') content = <AcademicDeliveryPage departments={platform.departments} instructors={platform.people.filter((person) => person.role === 'instructor' && person.status === 'active')} onPlatformRefresh={platform.refresh} />;
   else if (currentPage === 'assignments') content = <AssignmentsPage role={role} assignments={platform.assignments} onOpenWorkspace={setWorkspace} onCreate={() => setModalType('assignment')} {...shared} />;
@@ -116,7 +126,7 @@ function AuthenticatedApp({ user, role, page, setPage, workspace, setWorkspace, 
   else content = null;
 
   return <div className="app-shell">
-    <Header role={role} user={user} courses={platform.courses} assignments={platform.assignments} onNavigate={navigate} onOpenAssignment={setWorkspace} onLogout={logout} onMenuToggle={() => setMenuOpen(true)} />
+    <Header role={role} user={user} courses={platform.courses} assignments={platform.assignments} assignmentsEnabled={assignmentsEnabled} onNavigate={navigate} onOpenAssignment={setWorkspace} onLogout={logout} onMenuToggle={() => setMenuOpen(true)} />
     <Sidebar role={role} page={currentPage} open={menuOpen} onNavigate={navigate} onClose={() => setMenuOpen(false)} />
     <main className="app-content"><Suspense fallback={<div className="data-state">جارٍ تحميل الصفحة...</div>}>{content}</Suspense></main>
     {modalType ? <CreateModal type={modalType} courses={platform.courses} departments={platform.departments} instructors={platform.people.filter((person) => person.role === 'instructor' && person.status === 'active')} onClose={() => setModalType(null)} onCreated={platform.refresh} /> : null}

@@ -4,14 +4,14 @@ import { useMemo, useState } from 'react';
 
 const roleNames = { student: 'طالب', teacher: 'أستاذ', admin: 'مدير النظام' };
 
-export default function Header({ role, user, courses = [], assignments = [], onNavigate, onOpenAssignment, onLogout, onMenuToggle }) {
+export default function Header({ role, user, courses = [], assignments = [], assignmentsEnabled = true, onNavigate, onOpenAssignment, onLogout, onMenuToggle }) {
   const [query, setQuery] = useState('');
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return [];
     return [
       ...courses.filter((item) => `${item.code} ${item.title}`.toLowerCase().includes(normalized)).map((item) => ({ ...item, kind: 'course' })),
-      ...assignments.filter((item) => `${item.title} ${item.courseTitle}`.toLowerCase().includes(normalized)).map((item) => ({ ...item, kind: 'assignment' })),
+      ...(assignmentsEnabled ? assignments.filter((item) => `${item.title} ${item.courseTitle}`.toLowerCase().includes(normalized)).map((item) => ({ ...item, kind: 'assignment' })) : []),
     ].slice(0, 6);
   }, [assignments, courses, query]);
   return (
@@ -20,7 +20,7 @@ export default function Header({ role, user, courses = [], assignments = [], onN
       <Brand />
       <label className="search-box">
         <Search size={18} aria-hidden="true" />
-        <input aria-label="البحث في المنصة" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ابحث في المقررات والواجبات..." />
+        <input aria-label="البحث في المنصة" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={assignmentsEnabled ? 'ابحث في المقررات والواجبات...' : 'ابحث في المقررات...'} />
         {query ? <div className="search-results">{results.length ? results.map((item) => <button type="button" key={`${item.kind}-${item.id}`} onClick={() => { setQuery(''); if (item.kind === 'course') onNavigate('courses'); else onOpenAssignment(item); }}><strong>{item.title}</strong><small>{item.kind === 'course' ? item.code : item.courseTitle}</small></button>) : <span>لا توجد نتائج في بياناتك.</span>}</div> : null}
       </label>
       <div className="topbar__actions">

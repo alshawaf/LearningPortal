@@ -33,14 +33,18 @@ function cookieValue(cookieHeader: string, name: string) {
 try {
   await client.connect();
   const passwordHash = await hashPassword(password);
-  const level = await client.query<{ id: string }>(
-    `select l.id from app.academic_levels l
+  const level = await client.query<{ id: string; section_id: string }>(
+    `select l.id,x.id as section_id from app.academic_levels l
      join app.specializations s on s.id = l.specialization_id
      join app.academic_departments d on d.id = s.department_id
+     join app.academic_sections x on x.level_id=l.id and x.status='active'
+     join app.academic_years y on y.id=x.academic_year_id and y.status='active'
      where l.is_active and s.is_active and d.is_active order by l.created_at limit 1`,
   );
   const levelId = level.rows[0]?.id;
+  const sectionId = level.rows[0]?.section_id;
   assert.ok(levelId, 'Academic hierarchy must include an active level');
+  assert.ok(sectionId, 'An active matching section is required');
 
   for (const input of [
     { email: adminEmail, phone: `+96771${suffix.slice(-7)}`, name: 'مدير اختبار التسجيل', role: 'admin' },
@@ -83,6 +87,7 @@ try {
   const list = await app.inject({ method: 'GET', url: '/api/v1/registration/admin', headers: { cookie: adminCookies } });
   assert.equal(list.statusCode, 200, list.body);
   assert.ok(list.json().requests.some((request: { id: string }) => request.id === requestId));
+  assert.ok(list.json().sections.some((section: { id: string }) => section.id === sectionId));
 
   const update = await app.inject({ method: 'PATCH', url: `/api/v1/registration/admin/${requestId}`, headers: { origin, cookie: adminCookies, 'x-csrf-token': csrf }, payload: {
     email: editedEmail, phone: `+96774${suffix.slice(-7)}`, displayName: 'طالب معدّل من الإدارة', studentNumber: `ED${suffix}`,
@@ -91,7 +96,7 @@ try {
   assert.equal(update.statusCode, 200, update.body);
 
   const changesRequested = await app.inject({ method: 'POST', url: `/api/v1/registration/admin/${requestId}/decision`, headers: { origin, cookie: adminCookies, 'x-csrf-token': csrf }, payload: {
-    decision: 'changes_requested', reason: 'يرجى مراجعة بيانات الهوية مع الإدارة.',
+    decision: 'changes_requested', reason: 'يرجى مراجعة بيانات الهوية مع الإدارة.', sectionId: null,
   } });
   assert.equal(changesRequested.statusCode, 200, changesRequested.body);
   const changedStatus = await app.inject({ method: 'GET', url: '/api/v1/registration/status', headers: { cookie: trackingCookies } });
@@ -99,7 +104,7 @@ try {
   assert.match(changedStatus.json().registration.decisionReason, /مراجعة/);
 
   const approval = await app.inject({ method: 'POST', url: `/api/v1/registration/admin/${requestId}/decision`, headers: { origin, cookie: adminCookies, 'x-csrf-token': csrf }, payload: {
-    decision: 'approved', reason: null,
+    decision: 'approved', reason: null, sectionId,
   } });
   assert.equal(approval.statusCode, 200, approval.body);
   const approvedUserId = approval.json().approvedUserId;
@@ -111,7 +116,7 @@ try {
   assert.equal(approvedLogin.json().user.role, 'student');
 
   const membership = await client.query(`select count(*)::int as count from app.section_memberships where student_user_id=$1`,[approvedUserId]);
-  assert.equal(membership.rows[0].count,0,'Approving an account must not guess or auto-assign a section');
+  assert.equal(membership.rows[0].count,1,'Approval must activate the account and assign the selected section atomically');
 
   const studentAdminDenied = await app.inject({ method: 'GET', url: '/api/v1/registration/admin', headers: { cookie: cookiesFrom(approvedLogin) } });
   assert.equal(studentAdminDenied.statusCode, 403, studentAdminDenied.body);
@@ -122,7 +127,7 @@ try {
   assert.deepEqual(audits.rows.map((row) => row.action), [
     'registration.submitted', 'registration.updated_by_admin', 'registration.changes_requested', 'registration.approved',
   ]);
-  console.log('Student registration submission, review, admin editing, approval without implicit section assignment, and isolation smoke test passed.');
+  console.log('Student registration submission, review, approval with explicit section assignment, and isolation smoke test passed.');
 } finally {
   if (app) await app.close();
   if (requestId) await client.query('delete from app.audit_logs where target_id = $1', [requestId]).catch(() => undefined);

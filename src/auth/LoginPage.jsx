@@ -3,7 +3,7 @@ import { Eye, EyeOff, LockKeyhole, UserRound } from 'lucide-react';
 import Brand from '../components/Brand';
 import { useAuth } from './AuthContext';
 
-export default function LoginPage({ onRegister }) {
+export default function LoginPage({ onRegister, onPrivacy }) {
   const { login, notice } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -35,6 +35,7 @@ export default function LoginPage({ onRegister }) {
         <div className="auth-divider"><span>أو</span></div>
         <button type="button" className="button button--outline login-register" onClick={onRegister}><UserRound /> تسجيل طالب</button>
         <p className="login-help">إذا تعذر الدخول، تواصل مع مسؤول المنصة. لا تشارك كلمة مرورك مع أي شخص.</p>
+        <button type="button" className="auth-text-button" onClick={onPrivacy}>سياسة الخصوصية</button>
       </form>
     </section>
   </main>;

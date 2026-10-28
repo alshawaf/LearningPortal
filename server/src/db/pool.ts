@@ -1,6 +1,7 @@
 import pg, { type PoolClient, type QueryResultRow } from 'pg';
 import { config } from '../config.js';
 import type { AuthUser } from '../domain/auth.js';
+import { databaseSsl } from './ssl.js';
 
 const { Pool } = pg;
 
@@ -10,7 +11,7 @@ export const pool = new Pool({
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
   maxUses: 7_500,
-  ssl: config.isProduction ? { rejectUnauthorized: true } : false,
+  ssl: databaseSsl(config.databaseSslMode, config.isProduction),
   application_name: 'learning-portal-api',
 });
 

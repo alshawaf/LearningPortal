@@ -1,6 +1,7 @@
 import { Mail, Phone, ShieldCheck, UserRound } from 'lucide-react';
 import PasswordChangeForm from '../auth/PasswordChangeForm';
 import { PageHeading } from '../components/Ui';
+import { SUPPORT_EMAIL } from '../config/features';
 
 const roleNames = { student: 'طالب', teacher: 'أستاذ', admin: 'مدير النظام' };
 
@@ -23,5 +24,6 @@ export default function SettingsPage({ user, role }) {
         <p className="security-session-note">بعد نجاح التغيير سيتم إنهاء جميع جلسات حسابك، وستحتاج إلى تسجيل الدخول بكلمة المرور الجديدة.</p>
       </section>
     </div>
+    <section className="panel settings-support"><h2>الخصوصية والدعم</h2><p>تخضع بيانات الحساب ومحاولات التدريبات لسياسة خصوصية الإطلاق التجريبي.</p><div><a href="/privacy" target="_blank" rel="noreferrer">قراءة سياسة الخصوصية</a>{SUPPORT_EMAIL ? <a href={`mailto:${SUPPORT_EMAIL}`}>التواصل مع الدعم</a> : null}</div></section>
   </div>;
 }

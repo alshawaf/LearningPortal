@@ -1,11 +1,13 @@
-import { BookOpen, ClipboardCheck, Code2, Pencil, Plus, Power, UserRoundCog, Users } from 'lucide-react';
+import { BookOpen, BrainCircuit, ClipboardCheck, Code2, Pencil, Plus, Power, UserRoundCog, Users } from 'lucide-react';
 import { useState } from 'react';
 import { DataState, PageHeading, PrimaryButton, Progress } from '../components/Ui';
 import { ChangeCourseStatusModal, EditCourseModal } from '../components/CourseManagementModals';
 import CourseEnrollmentsModal from '../components/CourseEnrollmentsModal';
 import { offeringContext } from '../lib/courseLabels';
+import { featureEnabled } from '../config/features';
 
 export default function CoursesPage({ role, courses, instructors = [], departments = [], loading, error, onNavigate, onCreate, onRefresh }) {
+  const assignmentsEnabled = featureEnabled('assignments', role);
   const [editingCourse, setEditingCourse] = useState(null);
   const [statusCourse, setStatusCourse] = useState(null);
   const [rosterCourse, setRosterCourse] = useState(null);
@@ -28,15 +30,15 @@ export default function CoursesPage({ role, courses, instructors = [], departmen
         {courses.map((course) => <article className="course-card" key={course.offeringId ?? course.id}>
           <div className="course-card__head"><span>{course.code}</span><div><em className={`status ${course.isActive ? 'status--success' : 'status--muted'}`}>{course.isActive ? 'نشط' : 'موقوف'}</em><Code2 /></div></div>
           <div className="course-card__body">{role==='admin'?<span className="course-card__offering">تعريف مستقل في دليل المقررات</span>:<span className="course-card__offering">{offeringContext(course)}</span>}<h2>{course.title}</h2>{role==='admin'?<><p className="course-card__teacher">يُربط بالأستاذ عند طرحه لشعبة</p><p className="course-card__path">{course.offeringCount} طرح مرتبط بهذا المقرر</p></>:<><p className="course-card__teacher">الأستاذ: <strong>{course.ownerName || 'لم يحدد أستاذ'}</strong></p><p className="course-card__path">{course.departmentName} ‹ {course.specializationName} ‹ {course.levelName}</p></>}</div>
-          <div className="course-card__meta">{role==='admin'?<><span><BookOpen /> {course.offeringCount} طرح</span><span><Users /> دون طلاب مباشرين</span></>:<><span><BookOpen /> {course.assignmentCount} واجب</span><span><Users /> {course.memberCount} طالب</span></>}</div>
-          {role === 'student' ? <Progress value={course.progress} /> : null}
+          <div className="course-card__meta">{role==='admin'?<><span><BookOpen /> {course.offeringCount} طرح</span><span><Users /> دون طلاب مباشرين</span></>:<><span><BookOpen /> {assignmentsEnabled ? `${course.assignmentCount} واجب` : 'التدريبات متاحة'}</span><span><Users /> {course.memberCount} طالب</span></>}</div>
+          {role === 'student' && assignmentsEnabled ? <Progress value={course.progress} /> : null}
           <footer className={`course-card__actions ${role === 'admin' ? 'course-card__actions--admin' : role === 'teacher' ? 'course-card__actions--teacher' : ''}`} aria-label={`إجراءات مقرر ${course.title}`}>
             {role === 'admin' ? <>
               <button onClick={() => setEditingCourse(course)} aria-label={`تعديل بيانات مقرر ${course.title}`}><Pencil /><span>تعديل البيانات</span></button>
               <button className={course.isActive ? 'is-danger' : 'is-activate'} onClick={() => setStatusCourse(course)} aria-label={`${course.isActive ? 'إيقاف' : 'تفعيل'} مقرر ${course.title}`}><Power /><span>{course.isActive ? 'إيقاف' : 'تفعيل'}</span></button>
             </> : null}
             {role === 'teacher' ? <button onClick={() => setRosterCourse(course)} aria-label={`عرض طلاب مقرر ${course.title}`}><UserRoundCog /><span>طلاب المقرر</span></button> : null}
-            {role !== 'admin'?<button onClick={() => onNavigate('assignments')} aria-label={`${role === 'student' ? 'عرض' : 'إدارة'} واجبات مقرر ${course.title}`}><ClipboardCheck /><span>{role === 'student' ? 'عرض الواجبات' : 'إدارة الواجبات'}</span></button>:null}
+            {role !== 'admin'?<button onClick={() => onNavigate(assignmentsEnabled ? 'assignments' : 'practices')} aria-label={`${role === 'student' ? 'عرض' : 'إدارة'} ${assignmentsEnabled ? 'واجبات' : 'تدريبات'} مقرر ${course.title}`}>{assignmentsEnabled ? <ClipboardCheck /> : <BrainCircuit />}<span>{role === 'student' ? `عرض ${assignmentsEnabled ? 'الواجبات' : 'التدريبات'}` : `إدارة ${assignmentsEnabled ? 'الواجبات' : 'التدريبات'}`}</span></button>:null}
           </footer>
         </article>)}
       </div>

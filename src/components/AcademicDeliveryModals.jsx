@@ -1,6 +1,7 @@
 import { CalendarRange, GraduationCap, Layers3, School, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { apiFetch } from '../lib/api';
+import { formatDateOnly } from '../lib/date';
 import Select from './Select';
 
 const deliveryStatuses=[{value:'planned',label:'مخطط'},{value:'active',label:'نشط'},{value:'completed',label:'مكتمل'},{value:'archived',label:'مؤرشف'}];
@@ -69,5 +70,5 @@ function EntityModal({title,icon,endpoint,method,onClose,onSaved,transform=(valu
  return <div className="modal-backdrop" role="presentation"><section className={`modal ${wide?'modal--delivery':''}`} role="dialog" aria-modal="true" aria-labelledby="delivery-modal-title"><header><div className="delivery-modal-title"><span>{icon}</span><h2 id="delivery-modal-title">{title}</h2></div><button type="button" className="icon-button" onClick={onClose} aria-label="إغلاق"><X/></button></header><form onSubmit={submit}>{error?<div className="auth-error" role="alert">{error}</div>:null}{children}<footer><button type="button" className="button button--outline" onClick={onClose}>إلغاء</button><button type="submit" className="button button--primary" disabled={submitting}>{submitting?'جارٍ الحفظ...':'حفظ'}</button></footer></form></section></div>;
 }
 function DateFields({value}){return <div className="form-row"><label>تاريخ البداية <span className="field-hint">(اختياري)</span><input name="startsOn" type="date" defaultValue={dateValue(value?.startsOn)}/></label><label>تاريخ النهاية <span className="field-hint">(اختياري)</span><input name="endsOn" type="date" defaultValue={dateValue(value?.endsOn)}/></label></div>;}
-function dateValue(value){return value?String(value).slice(0,10):'';}
+function dateValue(value){return formatDateOnly(value);}
 function calendarValues(value){return{...value,startsOn:value.startsOn||null,endsOn:value.endsOn||null};}

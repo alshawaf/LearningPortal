@@ -1,6 +1,8 @@
 import { Activity, BarChart3, BookOpen, BrainCircuit, CalendarRange, ClipboardCheck, FileCode2, GraduationCap, Home, Network, Settings, Users, X } from 'lucide-react';
 import Brand from './Brand';
 import { pagePath } from '../lib/navigation';
+import { isPageAllowed } from '../lib/navigation';
+import { supportHref } from '../config/features';
 
 const menus = {
   student: [
@@ -21,7 +23,7 @@ export default function Sidebar({ role, page, open, onNavigate, onClose }) {
       <aside className={`sidebar ${open ? 'is-open' : ''}`}>
         <div className="sidebar__mobile-brand"><Brand compact /><button className="icon-button" onClick={onClose}><X size={19} /></button></div>
         <nav aria-label="التنقل الرئيسي">
-          {menus[role].map(([key, label, Icon]) => (
+          {menus[role].filter(([key]) => isPageAllowed(key, role)).map(([key, label, Icon]) => (
             <a
               key={key}
               href={pagePath(key)}
@@ -41,7 +43,7 @@ export default function Sidebar({ role, page, open, onNavigate, onClose }) {
         <div className="sidebar__support">
           <GraduationCap size={25} />
           <div><strong>هل تحتاج مساعدة؟</strong><small>تواصل مع فريق الدعم الأكاديمي</small></div>
-          <button>مركز المساعدة</button>
+          {supportHref() ? <a className="sidebar-support-link" href={supportHref()}>مركز المساعدة</a> : <span className="sidebar-support-pending">بيانات الدعم قيد الإعداد</span>}
         </div>
       </aside>
     </>
