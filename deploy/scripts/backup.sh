@@ -13,6 +13,7 @@ docker compose --env-file "$ENV_FILE" -f compose.production.yaml exec -T postgre
   pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --file=/tmp/backup.dump
 docker compose --env-file "$ENV_FILE" -f compose.production.yaml exec -T postgres pg_restore --list /tmp/backup.dump >/dev/null
 docker compose --env-file "$ENV_FILE" -f compose.production.yaml cp postgres:/tmp/backup.dump "$TARGET"
+chmod 600 "$TARGET"
 docker compose --env-file "$ENV_FILE" -f compose.production.yaml exec -T postgres rm -f /tmp/backup.dump
 find "$BACKUP_DIR" -type f -name 'learning-portal-*.dump' -mtime "+${BACKUP_RETENTION_DAYS:-14}" -delete
 echo "Verified backup created: $TARGET"
